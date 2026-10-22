@@ -38,13 +38,13 @@ def q_rhoV(rho, V):
 def q_gamPM(gam, P, M):
     return (gam / 2) * P * M**2
 
-def SoS(gam, Rs, T):
+def getSoS(gam, Rs, T):
     return math.sqrt(gam * Rs * T)
 
 def getRs(mol):
     return 8314.5 / mol
 
-def Cp(gam, Rs):
+def getCp(gam, Rs):
     return (Rs / (gam - 1)) + Rs
 
 def gam_T(gami, T):
@@ -89,7 +89,7 @@ def obliqueTheta(gam, M, betaDeg):
     return math.degrees(thetaRad)
 
 def obliqueMout(gam, M, betaDeg, thetaDeg):
-	beta = math.radians(betaDeg)
+    beta = math.radians(betaDeg)
     theta = math.radians(thetaDeg)
     return math.sqrt(((gam - 1) * M**2 * math.sin(beta)**2 + 2) / (((2 * gam * M**2 * math.sin(beta)**2) - (gam - 1)) * math.sin(beta - theta)**2))
 
@@ -125,7 +125,5 @@ def obliqueBeta(gam, M, theta):
         else:
             continue
     candidates.sort(key=lambda x: x[2])
-    for x in candidates:
-        print(x)
     return candidates[0][0]
 
