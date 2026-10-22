@@ -29,7 +29,7 @@ class Station:
             strPt = f"{Pet} bar"
         else:
             strPt = f"{self.Pt} Pa"
-        strMol = self.mol#.get("avg")
+        strMol = self.mol.get("avg")
         return f"Station {self.station}\nM: {self.M}\nP: {strP}\nT: {self.T} K\nrho: {self.rho} kg/m3\ngam: {self.gam}\nPt: {strPt}\nTt: {self.Tt}\nmol: {strMol} g\nRs: {self.Rs}\nCp: {self.Cp} J/kg-K\nSoS: {self.SoS}\nV: {self.V} m/s"
 
 def initEmptyStation():
@@ -99,7 +99,7 @@ def getAmbientStation(alt):
     amb.T = T
     amb.rho = rho
     amb.gam = egg.gam_T(gamiAir, T)
-    amb.mol = molAir
+    amb.mol.update({"avg": molAir})
     amb.Rs = RsAir
     amb.Cp = egg.getCp(amb.gam, RsAir)
     amb.SoS = egg.getSoS(amb.gam, RsAir, T)
@@ -130,5 +130,3 @@ def staticStationAtMach(sta, M):
     sta.SoS = egg.getSoS(sta.gam, sta.Rs, sta.T)
     sta.V = sta.SoS * M
     return sta
-
-
