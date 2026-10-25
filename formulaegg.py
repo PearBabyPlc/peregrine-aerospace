@@ -1,6 +1,21 @@
 import math
 import numpy as np
 
+def getMol(gas):
+    match gas:
+        case "N2":
+            return 28.014
+        case "O2":
+            return 31.998
+        case "H2O":
+            return 18.015
+        case "H2":
+            return 2.016
+        case "air":
+            return 28.9644
+        case _:
+            return -1.0
+
 def Tt_T(gam, M):
     return 1 + ((gam - 1) / 2) * M**2
 
@@ -126,4 +141,3 @@ def obliqueBeta(gam, M, theta):
             continue
     candidates.sort(key=lambda x: x[2])
     return candidates[0][0]
-
