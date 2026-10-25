@@ -6,6 +6,7 @@ rEarth = 6356766.0
 g = 9.80665
 molAir = 28.9644
 Runiv = 8314.46
+Runiv= 8314.46 / 1000
 RsAir = Runiv / molAir
 gamiAir = 1.4
 
@@ -51,7 +52,7 @@ class Shockwave:
     def __str__(self):
         return f"Type: {self.type} shock\nDeflection: {self.theta} deg\nShock angle: {self.beta}\nStagnation pressure ratio: {self.Ptr}"
 
-class Station:
+class Airflow:
     def __init__(self, note, M, P, T, rho, gam, Pt, Tt, mol, Rs, Cp, SoS, V, mdot, A):
         self.note = str(note)
         self.M = float(M)
@@ -215,6 +216,58 @@ class Station:
             Ptr = self.Pt / prevPt
             return Shockwave("oblique", theta, beta, Ptr)
 
+    def bypassAirflow(self, bypassRatio):
+        mdotCore = self.mdot / (bypassRatio + 1)
+        mdotBypass = self.mdot - mdotCore
+        bypass = Airflow("bypass", self.M, self.P, self.T, self.rho, self.gam, self.Pt, self.Tt, self.mol, self.Rs, self.Cp, self.SoS, self.V, mdotBypass, -1.0)
+        bypass.updateArea()
+        self.mdot = mdotCore
+        self.updateArea()
+        return bypass
+
+    def mixAirflows(self, byp):
+        mdotOut = self.mdot + byp.mdot
+        Aout = self.A + byp.A
+        QB = self.mdot / self.rho
+        QC = byp.mdot / byp.rho
+        KB = 0.5 * self.mdot * self.V**2
+        KC = 0.5 * byp.mdot * byp.V**2
+        Kout = KB + KC
+        Vout = math.sqrt((2 * Kout) / mdotOut)
+        Qout = Aout * Vout
+        rhoOut = mdotOut / Qout
+        uB = math.sqrt((3 * Runiv * self.T) / self.mol.get("avg"))
+        uC = math.sqrt((3 * Runiv * byp.T) / byp.mol.get("avg"))
+        nB = self.mdot / self.mol.get("avg")
+        nC = byp.mdot / byp.mol.get("avg")
+        nOut = nB + nC
+        molOut = mdotOut / nOut
+        uOut = math.sqrt(((nB * uB**2) + (nC * uC**2)) / nOut)
+        Tout = (uOut**2 * molOut) / (3 * Runiv)
+        RsOut = (Runiv / molOut) * 1000
+        Pout = RsOut * Tout * rhoOut
+        gamOut = egg.gam_T(gamiAir, Tout)
+        SoSout = egg.getSoS(gamOut, RsOut, Tout)
+        Mout = Vout / SoSout
+        PtOut = Pout * egg.Pt_P(gamOut, Mout)
+        TtOut = Tout * egg.Tt_T(gamOut, Mout)
+        CpOut = egg.getCp(gamOut, RsOut)
+        self.M = Mout
+        self.P = Pout
+        self.T = Tout
+        self.rho = rhoOut
+        self.gam = gamOut
+        self.Pt = PtOut
+        self.Tt = TtOut
+        self.mol.update({"avg": molOut})
+        self.Rs = RsOut
+        self.Cp = CpOut
+        self.SoS = SoSout
+        self.V = Vout
+        self.mdot = mdotOut
+        self.A = Aout
+        byp.note = "this stream is joever"     
+
 ###
 # M, Mach
 # P, Pa, but displays in bar above 100kPa
@@ -234,7 +287,7 @@ class Station:
 
 def initEmptyStation():
     emptyMol = {"avg": -1.0}
-    emptyStation = Station("empty", -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, emptyMol, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
+    emptyStation = Airflow("empty", -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, emptyMol, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
     return emptyStation
 
 def initConstantQTrajectory(Q, maxAltM, step):
