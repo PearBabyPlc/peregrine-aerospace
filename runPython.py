@@ -13,7 +13,7 @@ def obliqueShockInletDemo(dynamicP, flightVel, inletArea, inletAngle):
     PtLoss = 1.0
     while sta.M > 1.0:
         sta.getMaxTheta()
-        shock = sta.doShockwave(inletArea)
+        shock = sta.doShockwave(inletAngle)
         print(shock)
         sta.summary()
         print()
@@ -22,8 +22,6 @@ def obliqueShockInletDemo(dynamicP, flightVel, inletArea, inletAngle):
             break
     return PtLoss
 
-stagPloss = obliqueShockInletDemo(30000, 1050, 10.0, 12.0)
+stagPloss = obliqueShockInletDemo(30000, 1050, 10.0, 16.0)
 print()
 print(f"Stagnation pressure ratio: {stagPloss}")
-
-
