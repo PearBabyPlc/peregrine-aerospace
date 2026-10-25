@@ -141,3 +141,4 @@ def obliqueBeta(gam, M, theta):
             continue
     candidates.sort(key=lambda x: x[2])
     return candidates[0][0]
+
