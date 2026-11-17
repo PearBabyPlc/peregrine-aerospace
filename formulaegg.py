@@ -1,6 +1,7 @@
 import math
 import numpy as np
 
+#molar bullshit
 def getMol(gas):
     match gas:
         case "N2":
@@ -16,6 +17,7 @@ def getMol(gas):
         case _:
             return -1.0
 
+#isentropic relations
 def Tt_T(gam, M):
     return 1 + ((gam - 1) / 2) * M**2
 
@@ -56,8 +58,9 @@ def q_gamPM(gam, P, M):
 def getSoS(gam, Rs, T):
     return math.sqrt(gam * Rs * T)
 
+#heat capacity
 def getRs(mol):
-    return 8314.5 / mol
+    return 8314.46 / mol
 
 def getCp(gam, Rs):
     return (Rs / (gam - 1)) + Rs
@@ -67,6 +70,7 @@ def gam_T(gami, T):
     TT = Theta / T
     return 1 + ((gami - 1) / (1 + (gami - 1) * (TT**2 * (math.exp(TT) / (math.exp(TT) - 1)**2))))
 
+#ideal gas law
 def rhoIdeal(P, Rs, T):
     return P / (Rs * T)
 
@@ -76,10 +80,7 @@ def Pideal(rho, Rs, T):
 def Tideal(P, rho, Rs):
     return P / (rho * Rs)
 
-def maxTheta(gam, M):
-    thetaRad = (4 / (3 * math.sqrt(3) * (gam + 1))) * ((M**2 - 1)**1.5 / M**2)
-    return math.degrees(thetaRad)
-
+#normal shock relations
 def normalPr(gam, M):
     return (2 * gam * M**2 - (gam - 1)) / (gam + 1)
 
@@ -96,6 +97,11 @@ def normalPtr(gam, M):
     rhor = normalRhor(gam, M)
     Pr = normalPr(gam, M)
     return rhor**(gam / (gam - 1)) * (Pr**(-1))**(1 / (gam - 1))
+
+#oblique shock relations
+def maxTheta(gam, M):
+    thetaRad = (4 / (3 * math.sqrt(3) * (gam + 1))) * ((M**2 - 1)**1.5 / M**2)
+    return math.degrees(thetaRad)
 
 def obliqueTheta(gam, M, betaDeg):
     beta = math.radians(betaDeg)
@@ -137,8 +143,34 @@ def obliqueBeta(gam, M, theta):
             continue
         elif ((thetaCand - theta) > 1.0):
             break
-        else:
-            continue
+        #else:
+            #continue
     candidates.sort(key=lambda x: x[2])
     return candidates[0][0]
 
+#Prandtl-Meyer expansion fans
+def PrandtlMeyerAngle(gam, M):
+    PMrad = math.sqrt((gam + 1) / (gam - 1)) * math.atan(math.sqrt(((gam - 1) / (gam + 1)) * (M**2 - 1))) - math.atan(math.sqrt(M**2 - 1))
+    return math.degrees(PMrad)
+
+def maxPrandtlMeyerAngle(gam):
+    maxPMrad = (math.pi / 2) * (math.sqrt((gam + 1) / (gam - 1)) - 1)
+    return math.degrees(maxPMrad)
+
+def expansionMout(gam, M, expDeg):
+    Mrange = np.linspace(1.0, 50.0, num=10000)
+    candidates = []
+    PMin = PrandtlMeyerAngle(gam, M)
+    for x in Mrange:
+        PMcand = PrandtlMeyerAngle(gam, x)
+        PMdiff = PMcand - PMin
+        if (abs(PMdiff - expDeg) < 0.1):
+            candTup = (x, PMcand, PMdiff)
+            candidates.append(candTup)
+            continue
+        elif ((PMdiff - expDeg) > 1.0):
+            break
+        #else:
+            #continue
+    candidates.sort(key=lambda x: x[2])
+    return candidates[0][0]
