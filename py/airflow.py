@@ -1,91 +1,350 @@
+import math
 import numpy as np
-from os import getcwd
-from scipy.interpolate import interp1d
+import formulaegg as egg
 
-# Methane data for 1 to 600 bar, 90.6941 to 625 Kelvin (no data above)
-# Hydrogen data for 1 to 600 bar, 13.957 to 1000 Kelvin (no data above)
-# Oxygen data for 1 to 600 bar, 54.361 to 600 Kelvin (limited for detail)
+rEarth = 6356766.0
+g = 9.80665
+molAir = 28.9644
+Runiv = 8314.46
+Rum = 8314.46 / 1000
+RsAir = Runiv / molAir
+gamiAir = 1.4
 
-class NISTlookup:
-    def __init__(self, molecule, T, P, rho, vol, U, H, S, Cv, Cp, SoS, JouleThomson, mu, thermalCond, phase):
-        try:
-            self.molecule = str(molecule)
-            self.T = float(T)
-            self.P = float(P)
-            self.rho = float(rho)
-            self.vol = float(vol)
-            self.U = float(U) #internal energy
-            self.H = float(H) #enthalpy
-            self.S = float(S) #entropy
-            self.Cv = float(Cv)
-            self.Cp = float(Cp)
-            self.SoS = float(SoS)
-            self.JouleThomson = float(JouleThomson)
-            self.mu = float(mu)
-            self.thermalCond = float(thermalCond)
-            self.phase = str(phase)
-        except:
-            self.molecule = molecule
-            self.T = T
-            self.P = P
-            self.rho = rho
-            self.vol = vol
-            self.U = U
-            self.H = H
-            self.S = S
-            self.Cv = Cv
-            self.Cp = Cp
-            self.SoS = SoS
-            self.JouleThomson = JouleThomson
-            self.mu = mu
-            self.thermalCond = thermalCond
-            self.phase = "ERROR"
+def getISA(geom):
+    H = (rEarth * geom) / (rEarth + geom)
+    if (H < 11000):
+        T = 288.15 + (-0.0065 * H)
+        P = 101325.0 * (288.15 / T)**((g * molAir) / (Runiv * -0.0065))
+    elif (H >= 11000) and (H < 20000):
+        T = 216.65
+        P = 22632.6352091 * math.exp((-g * molAir * (H - 11000)) / (Runiv * 216.65))
+    elif (H >= 20000) and (H < 32000):
+        T = 216.65 + (0.001 * (H - 20000))
+        P = 5475.15769257 * (216.65 / T)**((g * molAir) / (Runiv * 0.001))
+    elif (H >= 32000) and (H < 47000):
+        T = 228.65 + (0.0028 * (H - 32000))
+        P = 868.088257003 * (228.65 / T)**((g * molAir) / (Runiv * 0.0028))
+    elif (H >= 47000) and (H < 51000):
+        T = 270.65
+        P = 110.919037481 * math.exp((-g * molAir * (H - 47000)) / (Runiv * 270.65))
+    elif (H >= 51000) and (H < 71000):
+        T = 270.65 + (-0.0028 * (H - 51000))
+        P = 66.9471267903 * (270.65 / T)**((g * molAir) / (Runiv * -0.0028))
+    elif (H >= 71000) and (H < 84852):
+        T = 214.65 + (-0.002 * (H - 71000))
+        P = 3.95709671594 * (214.65 / T)**((g * molAir) / (Runiv * -0.002))
+    elif (H >= 84852) and (H < 90000):
+        T = 186.95
+        P = 0.373462257454 * math.exp((-g * molAir * (H - 84852)) / (Runiv * 186.95))
+    elif (H >= 90000):
+        T = 186.95 + (0.004 * (H - 90000))
+        P = 0.145778536657 * (186.95 / T)**((g * molAir) / (Runiv * 0.004))
+    rho = P / (T * RsAir)
+    return P, T, rho
+
+class Shockwave:
+    def __init__(self, type, theta, beta, Ptr):
+        self.type = str(type)
+        self.theta = float(theta)
+        self.beta = float(beta)
+        self.Ptr = float(Ptr)
+        self.id = int(-1)
 
     def __str__(self):
-        returnString = str(self.molecule + ", T=" + str(self.T) + ", P=" + str(self.P) + ", Cp=" + str(self.Cp) + ", mu=" + str(self.mu) + ", phase=" + self.phase)
-        return returnString
+        return f"Type: {self.type} shock\nDeflection: {self.theta} deg\nShock angle: {self.beta}\nStagnation pressure ratio: {self.Ptr}"
 
-def initLookupNIST(molecule, molRange):
-    output = []
-    for Pbar in molRange:
-        cwd = str(getcwd())
-        filename = str(cwd + r"/NISTlookupData/" + str(molecule) + "_" + str(Pbar) + r"b.txt")
-        lines = []
-        with open(filename) as lookupPbar:
-            for line in lookupPbar:
-                lines.append(line)
-        linesSplit = []
-        for line in lines:
-            lineSplit = line.split('\t')
-            linesSplit.append(lineSplit)
-        linesSplit.pop(0)
-        for line in linesSplit:
-            length = len(line)
-            if length != 14:
-                pass
-                #print("FAIL:", line)
-            else:
-                phase = line[-1]
-                #print("PASS:", line)
-                phase.rstrip('\n')
-                line.pop(-1)
-                line.append(phase)
-                lookupEntry = NISTlookup(molecule, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], line[8], line[9], line[10], line[11], line[12], line[13])
-                if lookupEntry.phase == "ERROR":
-                    pass
-                else:
-                    output.append(lookupEntry)
-    return output
+class ExpansionFan:
+    def __init__(self, nu, mu1, mu2):
+        self.nu = float(nu)
+        self.mu1 = float(mu1)
+        self.mu2 = float(mu2)
 
-def lookup_PT(lookupTable, Pain, T):
-    Pin = Pain / 100000
-    P = round(Pin)
-    lookupTable.sort(key=lambda x: abs(P - x.P))
-    lookupTable.sort(key=lambda x: abs(T - x.T))
-    return lookupTable[0]
+    def __str__(self):
+        return f"Expansion angle: {self.nu} deg\nMu1: {self.mu1} deg\nMu2: {self.mu2} deg"
 
-def initTriprop():
-    lookupH2 = initLookupNIST("H2", range(1, 601))
-    lookupO2 = initLookupNIST("O2", range(1, 601))
-    lookupCH4 = initLookupNIST("CH4", range(1, 601))
-    return lookupH2, lookupO2, lookupCH4
+class Airflow:
+    def __init__(self, note, M, P, T, rho, gam, Pt, Tt, mol, Rs, Cp, SoS, V, mdot, A):
+        self.note = str(note)
+        self.M = float(M)
+        self.P = float(P)
+        self.T = float(T)
+        self.rho = float(rho)
+        self.gam = float(gam)
+        self.Pt = float(Pt)
+        self.Tt = float(Tt)
+        self.mol = mol
+        self.Rs = float(Rs)
+        self.Cp = float(Cp)
+        self.SoS = float(SoS)
+        self.V = float(V)
+        self.mdot = float(mdot)
+        self.A = float(A)
+
+    def __str__(self):
+        if self.P > 100000.0:
+            Pee = self.P / 100000.0
+            strP = f"{Pee} bar"
+        else:
+            strP = f"{self.P} Pa"
+        if self.Pt > 100000.0:
+            Pet = self.Pt / 100000.0
+            strPt = f"{Pet} bar"
+        else:
+            strPt = f"{self.Pt} Pa"
+        strMol = self.mol.get("avg")
+        return f"{self.note}\nM: {self.M}\nP: {strP}\nT: {self.T} K\nrho: {self.rho} kg/m3\ngam: {self.gam}\nPt: {strPt}\nTt: {self.Tt}\nmol: {strMol} g\nRs: {self.Rs}\nCp: {self.Cp} J/kg-K\nSoS: {self.SoS}\nV: {self.V} m/s\nmdot: {self.mdot}kg/s\nA: {self.A}m2"
+
+    def summary(self):
+        print(f"M: {self.M}\nP: {self.P}\nT: {self.T}\nrho: {self.rho}\nV: {self.V}\nmdot: {self.mdot}\nA: {self.A}")
+
+    def getAvgMol(self):
+        totalStuff = 0.0
+        totalMass = 0.0
+        for x in self.mol.items():
+            if x[0] != "avg":
+                totalStuff += x[1]
+                xMol = egg.getMol(x[0])
+                totalMass += x[1] * xMol
+        avgMol = totalMass / totalStuff
+        self.mol.update({"avg": avgMol})
+
+    def getAmbientConds(self, alt):
+        Pres, Temp, Dens = getISA(alt)
+        self.P = Pres
+        self.T = Temp
+        self.rho = Dens
+        self.gam = egg.gam_T(gamiAir, Temp)
+        self.mol.update({"N2": 77})
+        self.mol.update({"O2": 23})
+        self.getAvgMol()
+        self.Rs = RsAir
+        self.Cp = egg.getCp(self.gam, RsAir)
+        self.SoS = egg.getSoS(self.gam, RsAir, Temp)
+
+    def getStagPT(self):
+        self.Pt = self.P * egg.Pt_P(self.gam, self.M)
+        self.Tt = self.T * egg.Tt_T(self.gam, self.M)
+
+    def getSoS(self):
+        try:
+            self.SoS = egg.getSoS(self.gam, self.Rs, self.T)
+        except:
+            self.SoS = egg.getSoS(gamiAir, RsAir, 288.15)
+
+    def setMach(self, Mach):
+        self.M = Mach
+        self.getStagPT()
+        self.getSoS()
+        self.V = self.SoS * Mach
+
+    def setVelocity(self, Vel):
+        self.V = Vel
+        self.getSoS()
+        self.M = Vel / self.SoS
+        self.getStagPT()
+
+    def updateArea(self):
+        self.A = self.mdot / (self.V * self.rho)
+
+    def setMdot(self, massflow):
+        self.mdot = massflow
+        self.updateArea()
+
+    def setArea(self, area):
+        self.A = area
+        self.mdot = area * self.V * self.rho
+
+    def getHeatCapacity(self):
+        self.gam = egg.gam_T(gamiAir, self.T)
+        self.Rs = Runiv / self.mol.get("avg")
+        self.Cp = egg.getCp(self.gam, self.Rs)
+
+    def getTstatic(self):
+        self.T = self.Tt * egg.T_Tt(self.gam, self.M)
+        self.getHeatCapacity()
+
+    def getPstatic(self):
+        self.P = self.Pt * egg.P_Pt(self.gam, self.M)
+
+    def getRhoIdeal(self):
+        self.rho = self.P / (self.Rs * self.T)
+        self.updateArea()
+
+    def getPideal(self):
+        self.P = self.rho * self.Rs * self.T
+
+    def getTideal(self):
+        self.T = self.P / (self.rho * self.Rs)
+        self.getHeatCapacity()
+
+    def updateMach(self, Mach):
+        self.M = Mach
+        self.getPstatic()
+        self.getTstatic()
+        self.getRhoIdeal()
+        self.getHeatCapacity()
+        self.setMach(Mach)
+
+    def doNormalShock(self):
+        self.P *= egg.normalPr(self.gam, self.M)
+        self.T *= egg.normalTr(self.gam, self.M)
+        self.rho *= egg.normalRhor(self.gam, self.M)
+        self.Pt *= egg.normalPtr(self.gam, self.M)
+        prevM = self.M
+        self.M = egg.normalMout(self.gam, prevM)
+        self.gam = egg.gam_T(gamiAir, self.T)
+        self.Cp = egg.getCp(self.gam, self.Rs)
+        self.Tt = self.T * egg.Tt_T(self.gam, self.M)
+        self.SoS = egg.getSoS(self.gam, self.Rs, self.T)
+        self.V = self.M * self.SoS
+        self.updateArea()
+
+    def doObliqueShock_getBeta(self, theta):
+        beta = egg.obliqueBeta(self.gam, self.M, theta)
+        self.P *= egg.obliquePr(self.gam, self.M, beta)
+        self.T *= egg.obliqueTr(self.gam, self.M, beta)
+        self.rho *= egg.obliqueRhor(self.gam, self.M, beta)
+        self.Pt *= egg.obliquePtr(self.gam, self.M, beta)
+        prevM = self.M
+        self.M = egg.obliqueMout(self.gam, prevM, beta, theta)
+        self.gam = egg.gam_T(gamiAir, self.T)
+        self.Cp = egg.getCp(self.gam, self.Rs)
+        self.Tt = self.T * egg.Tt_T(self.gam, self.M)
+        self.SoS = egg.getSoS(self.gam, self.Rs, self.T)
+        self.V = self.M * self.SoS
+        self.updateArea()
+        return beta
+
+    def getMaxTheta(self):
+        maxTheta = egg.maxTheta(self.gam, self.M)
+        print(f"Max deflection: {maxTheta} deg")
+
+    #at M=1.05 and gam=1.3, even a 0.5deg turn will lead to a normal shock
+    #so it has been selected as the Mach number that forces one
+    def doShockwave(self, theta):
+        maxTheta = egg.maxTheta(self.gam, self.M)
+        shockDict = dict()
+        prevPt = self.Pt
+        if theta >= maxTheta:
+            self.doNormalShock()
+            Ptr = self.Pt / prevPt
+            return Shockwave("normal", 0.0, 90.0, Ptr)
+        elif self.M <= 1.05:
+            self.doNormalShock()
+            Ptr = self.Pt / prevPt
+            return Shockwave("normal", 0.0, 90.0, Ptr)
+        else:
+            beta = self.doObliqueShock_getBeta(theta)
+            Ptr = self.Pt / prevPt
+            return Shockwave("oblique", theta, beta, Ptr)
+
+    def doExpansionFan(self, expansion):
+        prevM = self.M
+        moo1 = math.atan(1 / prevM)
+        mu1 = math.degrees(moo1)
+        Mfan = egg.expansionMout(self.gam, prevM, expansion)
+        self.M = Mfan
+        self.getPstatic()
+        self.getTstatic()
+        self.getRhoIdeal()
+        self.SoS = egg.getSoS(self.gam, self.Rs, self.T)
+        self.V = self.M * self.SoS
+        self.updateArea()
+        moo2 = math.atan(1 / self.M)
+        mu2 = math.degrees(moo2)
+        return ExpansionFan(expansion, mu1, mu2) 
+
+    def bypassAirflow(self, bypassRatio):
+        mdotCore = self.mdot / (bypassRatio + 1)
+        mdotBypass = self.mdot - mdotCore
+        bypass = Airflow("bypass", self.M, self.P, self.T, self.rho, self.gam, self.Pt, self.Tt, self.mol, self.Rs, self.Cp, self.SoS, self.V, mdotBypass, -1.0)
+        bypass.updateArea()
+        self.mdot = mdotCore
+        self.updateArea()
+        return bypass
+
+    def mixAirflows(self, byp):
+        mdotOut = self.mdot + byp.mdot
+        Aout = self.A + byp.A
+        QB = self.mdot / self.rho
+        QC = byp.mdot / byp.rho
+        KB = 0.5 * self.mdot * self.V**2
+        KC = 0.5 * byp.mdot * byp.V**2
+        Kout = KB + KC
+        Vout = math.sqrt((2 * Kout) / mdotOut)
+        Qout = Aout * Vout
+        rhoOut = mdotOut / Qout
+        uB = math.sqrt((3 * Rum * self.T) / self.mol.get("avg"))
+        uC = math.sqrt((3 * Rum * byp.T) / byp.mol.get("avg"))
+        nB = self.mdot / self.mol.get("avg")
+        nC = byp.mdot / byp.mol.get("avg")
+        nOut = nB + nC
+        molOut = mdotOut / nOut
+        uOut = math.sqrt(((nB * uB**2) + (nC * uC**2)) / nOut)
+        Tout = (uOut**2 * molOut) / (3 * Rum)
+        RsOut = (Rum / molOut) * 1000
+        Pout = RsOut * Tout * rhoOut
+        gamOut = egg.gam_T(gamiAir, Tout)
+        SoSout = egg.getSoS(gamOut, RsOut, Tout)
+        Mout = Vout / SoSout
+        PtOut = Pout * egg.Pt_P(gamOut, Mout)
+        TtOut = Tout * egg.Tt_T(gamOut, Mout)
+        CpOut = egg.getCp(gamOut, RsOut)
+        self.M = Mout
+        self.P = Pout
+        self.T = Tout
+        self.rho = rhoOut
+        self.gam = gamOut
+        self.Pt = PtOut
+        self.Tt = TtOut
+        self.mol.update({"avg": molOut})
+        self.Rs = RsOut
+        self.Cp = CpOut
+        self.SoS = SoSout
+        self.V = Vout
+        self.mdot = mdotOut
+        self.A = Aout
+        byp.note = "this stream is joever"     
+
+###
+# M, Mach
+# P, Pa, but displays in bar above 100kPa
+# T, K
+# rho, kg/m3
+# gam
+# Pt, Pa, but displays in bar above 100kPa
+# Tt, K
+# mol dict, mol.get("avg") for the desired value
+# Rs
+# Cp, J/kg-K
+# SoS, m/s
+# V, m/s
+# mdot, kg/s
+# A, m2
+###
+
+def initEmptyStation():
+    emptyMol = {"avg": -1.0}
+    emptyStation = Airflow("empty", -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, emptyMol, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0)
+    return emptyStation
+
+def initConstantQTrajectory(Q, maxAltM, step):
+    maxAlt = maxAltM + step
+    altMVrange = []
+    for x in range(0, maxAlt, step):
+        P, T, rho = getISA(x)
+        #print(f"{x} metres: {P}Pa, {T}K, {rho}kg/m3")
+        SoS = math.sqrt(RsAir * gamiAir * T)
+        Vreq = math.sqrt((2 * Q) / rho)
+        Mreq = Vreq / SoS
+        xTup = (x, Mreq, Vreq)
+        altMVrange.append(xTup)
+    return altMVrange
+
+def getAltitudeAtMach(altMVrange, M):
+    alt, _M, _V = min(altMVrange, key=lambda x: abs(M - x[1]))
+    return alt
+
+def getAltitudeAtVel(altMVrange, V):
+    alt, _M, _V = min(altMVrange, key=lambda x: abs(V - x[2]))
+    return alt
