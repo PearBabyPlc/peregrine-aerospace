@@ -154,6 +154,7 @@ def Ejector_A(sta, Aout):
         if (sta.A >= Aout):
             break
     return sta
+#TODO FIX there is a bug here that increases total temperature
 
 #will update composition
 def Combustor_Tmax():
