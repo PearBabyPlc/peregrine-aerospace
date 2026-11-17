@@ -118,13 +118,45 @@ def Converger_M(sta, Mout):
     return sta
 
 #reflected shock intake spike
-def Inlet_theta():
-    pass
+class InletRamp:
+    def __init__(self, theta):
+        self.theta = float(theta)
+        self.note = "empty"
+        self.OPR = 1.0
+        self.Ptr = 1.0
+        self.shocks = []
 
-#an attempt at some Prandtl Meyer stuff
-def Ejector_A():
-    pass
+    def __str__(self):
+        nshocks = len(self.shocks)
+        return f"Inlet ramp\nAngle: {self.theta} deg\nOverall pressure ratio: {self.OPR}\nStagnation pressure ratio: {self.Ptr}\n{nshocks} shocks"
+
+    def runInletRamp(self, sta):
+        Pin = sta.P
+        Ptin = sta.Pt
+        it = 0
+        while (sta.M >= 1.0):
+            shock = sta.doShockwave(self.theta)
+            it += 1
+            shock.id = it
+            self.shocks.append(shock)
+            if (shock.type == "normal"):
+                break
+        self.OPR = sta.P / Pin
+        self.Ptr = sta.Pt / Ptin
+        return sta
+
+#an attempt at some Prandtl Meyer stuff later? for now just fuckin Mstep
+def Ejector_A(sta, Aout):
+    while (sta.M >= 1.0):
+        newMach = sta.M + Mstep
+        sta.updateMach(newMach)
+        sta.updateArea()
+        if (sta.A >= Aout):
+            break
+    return sta
 
 #will update composition
 def Combustor_Tmax():
     pass
+
+#figure out best structure for classes
