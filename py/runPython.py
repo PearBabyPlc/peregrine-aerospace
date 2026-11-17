@@ -4,12 +4,24 @@ import jetEngines as jet
 import turbomachinery as turbo
 
 sta = air.initEmptyStation()
-sta.getAmbientConds(10000)
-sta.setVelocity(290)
-sta.setArea(5.0)
+sta.getAmbientConds(32000)
+sta.setVelocity(1000)
+sta.setArea(20.0)
 sta.getHeatCapacity()
 sta.note = "Ambient"
 print(sta)
+print()
+intake = jet.InletRamp(10.0)
+sta = intake.runInletRamp(sta)
+sta.note = "Inlet throat"
+print(sta)
+print()
+intake.note = "le inlet"
+print(intake)
+print()
+for x in intake.shocks:
+    print(x)
+    print()
 print()
 sta = jet.Diffuser_A(sta, 15.0)
 sta.note = "Diffuser"
@@ -43,11 +55,9 @@ PowerKW = Power / 1000
 print("POWAH:", PowerKW)
 print()
 sta = jet.Converger_M(sta, 1.0)
-sta.note = "Converging outlet"
+sta.note = "convergent ejector"
 print(sta)
 print()
-fan = sta.doExpansionFan(10.0)
-fan = sta.doExpansionFan(10.0)
-fan = sta.doExpansionFan(10.0)
-sta.note = "expansion fan 10,10,10"
+sta = jet.Ejector_A(sta, 20.0)
+sta.note = "ejector exit"
 print(sta)
