@@ -174,3 +174,15 @@ def expansionMout(gam, M, expDeg):
             #continue
     candidates.sort(key=lambda x: x[2])
     return candidates[0][0]
+
+#Rayleigh flow for combustion
+def Tt_Ttstar(gam, M):
+    raya = 2 * (gam + 1) * M**2
+    rayb = 1 + gam * M**2
+    rayc = Tt_T(gam, M)
+    return (raya / rayb**2) * rayc
+
+def Pt_Ptstar(gam, M):
+    raya = (gam + 1) / (1 + gam * M**2)
+    rayb = (2 / (gam + 1)) * Tt_T(gam, M)
+    return raya * rayb**(gam / (gam - 1))
