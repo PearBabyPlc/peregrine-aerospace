@@ -35,13 +35,10 @@ print(comp)
 sta.note = "Compressor outlet"
 print(sta)
 print()
+comber = jet.Combustor(2800)
+sta = comber.runCombustor(sta)
+print(comber)
 sta.note = "Turbine inlet"
-sta.T = 1800
-sta.getHeatCapacity()
-sta.P *= 0.9
-sta.setMach(0.6)
-sta.rho = sta.P / (sta.Rs * sta.T)
-sta.updateArea()
 print(sta)
 print()
 turb = jet.initTurbine(0.8, comp.Power)
@@ -61,3 +58,4 @@ print()
 sta = jet.Ejector_A(sta, 20.0)
 sta.note = "ejector exit"
 print(sta)
+
